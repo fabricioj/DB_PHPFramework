@@ -11,11 +11,15 @@ abstract class Tabela {
         return $this->propriedades_mapeadas;
     }
     public function CopiaRow($row){
+        if ($row == null || empty($row)){
+            return false;
+        }
+
         $reflect = new \ReflectionClass($this);
         $props   = $reflect->getProperties(\ReflectionProperty::IS_PUBLIC);
         foreach ($props as $prop) {
             $propNome = $prop->getName();
-            if ($row[$propNome]){
+            if (array_key_exists($propNome, $row)){
                 $this->{$propNome} = $row[$propNome];
             }
         }
