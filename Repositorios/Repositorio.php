@@ -200,8 +200,8 @@ class Repositorio {
         if (isset($criterios)){
             $parametros=[];
             if (is_array($criterios)){
+                $primeiro = true;
                 foreach ($criterios as $criterio) {
-                    $primeiro = true;
                     if (isset($coluna)){
                         $sql = $sql.($primeiro?" WHERE ":" AND ").$this->RetornaCondicaoSQL($criterio, $parametros);
                         $primeiro = false;
