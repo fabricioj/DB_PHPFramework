@@ -29,13 +29,13 @@ class TipoSQL extends Dominio
     }
     public function Inicializar(){
         $this->valores = ['Varchar' => 'Varchar',
+        'DateTime' => 'DateTime',
         'Int' => 'Int',
-        'DateTime' => 'DateTime'];
+        'Decimal' => 'Decimal'];
     }
 
     public static function Varchar(){ return new TipoSQL('Varchar'); }
-    public static function Int(){ return new TipoSQL('Int'); }
     public static function DateTime(){ return new TipoSQL('DateTime'); }
+    public static function Int(){ return new TipoSQL('Int'); }
+    public static function Decimal(){ return new TipoSQL('Decimal'); }
 }
-
-

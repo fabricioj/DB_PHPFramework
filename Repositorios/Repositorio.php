@@ -244,6 +244,8 @@ class Repositorio {
             return "%s";
         }else if ($valorTipoSQL == Utils\TipoSQL::Int()->RetornaValor()){
             return "%d";
+        }else if ($valorTipoSQL == Utils\TipoSQL::Decimal()->RetornaValor()){
+            return "%f";
         }else {
             return "";
         }        
@@ -253,7 +255,7 @@ class Repositorio {
         $tipoVariavel = gettype($variavel);
         if ($tipoVariavel == "integer"){
             return "%d";
-        } else if ($tipoVariavel == "double"){
+        } else if ($tipoVariavel == "double" || $tipoVariavel == "float"){
             return "%f";
         } else {
             return "%s";
