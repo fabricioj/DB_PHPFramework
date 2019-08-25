@@ -1,5 +1,6 @@
 <?php namespace Repositorios;
 use Utils;
+use Models;
 
 class Repositorio {
     protected $tabela;
@@ -10,16 +11,15 @@ class Repositorio {
         $this->wpdb = $wpdb;
         $this->tabela = $tabela;
     }
-    public function RetornaRegistros($criterios){    
+    public function RetornaRegistros($criterios=null, $agrupamento=null, $ordenacao=null){
         $parametros = null;
-        $sql = $this->RetornaSelectSQL($criterios, $parametros);
+        $sql = $this->RetornaSelectSQL($criterios, $agrupamento, $ordenacao, $parametros);
         $rows = null;
         if (!$parametros){
             $rows = $this->wpdb->get_results($sql, ARRAY_A);
         }else {
             $rows = $this->wpdb->get_results($this->wpdb->prepare($sql, $parametros), ARRAY_A);
         }
-
         $registros = [];
         $reflect = new \ReflectionClass($this->tabela);
         foreach ($rows as $row) {
@@ -28,24 +28,25 @@ class Repositorio {
             $registros[] = $registro;
         }
         return $registros;
+    }
 
+    public function RetornaRegistro($criterios=null, $agrupamento=null, $ordenacao=null){
+        $registros = $this->RetornaRegistros($criterios, $agrupamento, $ordenacao);
+        return $registros != null && !empty($registros)? $registros[0]: null;
     }
 
     public function InserirRegistro(Utils\Tabela $registro){
         $reflect = new \ReflectionClass($registro);
-        $colunasMapeamento = $registro->RetornaMapeamento();
-        if (!isset($colunasMapeamento)){
+        if (!$registro->RetornaMapeamento()){
             return false;
         }
 
-        $nomeTabela = $reflect->getName();
-        $mapeamentoTabela = $colunasMapeamento[$nomeTabela];
-        if (isset($mapeamentoTabela)){
-            $nomeTabela = $mapeamentoTabela->nome;
-        }
+        $registro->AntesGravar();
+
+        $nomeTabela = $registro->RetornaNomeTabelaMapeada();
 
         $sql = "INSERT INTO ".$nomeTabela;
-
+        
         $colunas="";
         $parametros="";
         $valores = [];
@@ -54,7 +55,7 @@ class Repositorio {
         $primeiro = true;
         foreach ($props as $key => $prop) {
             $propriedadeNome = $prop->getName();
-            $coluna = $colunasMapeamento[$propriedadeNome];
+            $coluna = $this->RetornaColunaMapeada($propriedadeNome);
             $valor = $prop->getValue($registro);
             if (isset($coluna) && isset($valor)){
                 $colunas = $colunas.(!$primeiro?", ":"").$coluna->nome;
@@ -68,6 +69,7 @@ class Repositorio {
         }
 
         $sql = $sql." (".$colunas.") VALUES (".$parametros.")";
+        
         $this->wpdb->query($this->wpdb->prepare($sql, $valores));
         $resultado = $this->wpdb->last_result;
         
@@ -78,16 +80,13 @@ class Repositorio {
 
     public function AtualizarRegistro(Utils\Tabela $registro){
         $reflect = new \ReflectionClass($registro);
-        $colunasMapeamento = $registro->RetornaMapeamento();
-        if (!isset($colunasMapeamento)){
+        if (!$registro->RetornaMapeamento()){
             return false;
         }
 
-        $nomeTabela = $reflect->getName();
-        $mapeamentoTabela = $colunasMapeamento[$nomeTabela];
-        if (isset($mapeamentoTabela)){
-            $nomeTabela = $mapeamentoTabela->nome;
-        }
+        $registro->AntesGravar();
+
+        $nomeTabela = $registro->RetornaNomeTabelaMapeada();
 
         $sql = "UPDATE ".$nomeTabela;
 
@@ -101,7 +100,7 @@ class Repositorio {
         $primeiraChave = true;
         foreach ($props as $key => $prop) {
             $propriedadeNome = $prop->getName();
-            $coluna = $colunasMapeamento[$propriedadeNome];
+            $coluna = $this->RetornaColunaMapeada($propriedadeNome);
             $valor = $prop->getValue($registro);
             if (isset($coluna)){
                 if (!$coluna->chave){
@@ -131,16 +130,11 @@ class Repositorio {
 
     public function DeletarRegistro(Utils\Tabela $registro){
         $reflect = new \ReflectionClass($registro);
-        $colunasMapeamento = $registro->RetornaMapeamento();
-        if (!isset($colunasMapeamento)){
+        if (!$registro->RetornaMapeamento()){
             return false;
         }
 
-        $nomeTabela = $reflect->getName();
-        $mapeamentoTabela = $colunasMapeamento[$nomeTabela];
-        if (isset($mapeamentoTabela)){
-            $nomeTabela = $mapeamentoTabela->nome;
-        }
+        $nomeTabela = $registro->RetornaNomeTabelaMapeada();
 
         $sql = "DELETE FROM ".$nomeTabela;
 
@@ -151,7 +145,7 @@ class Repositorio {
         $primeiraChave = true;
         foreach ($props as $key => $prop) {
             $propriedadeNome = $prop->getName();
-            $coluna = $colunasMapeamento[$propriedadeNome];
+            $coluna = $this->RetornaColunaMapeada($propriedadeNome);
             $valor = $prop->getValue($registro);
             if (isset($coluna) && $coluna->chave){
                 $sql = $sql.($primeiraChave?" WHERE ":" AND ").$coluna->nome." = ".$this->RetornaParametro($coluna->tipo);
@@ -169,12 +163,11 @@ class Repositorio {
         $this->wpdb->flush();
         return $resultado;
     }
-
-    public function RetornaSelectSQL($criterios, &$parametros){
+    
+    public function RetornaSelectSQL($criterios, $agrupamento, $ordenacao, &$parametros){
         $parametros = null;
         $sql = "";
-        $colunasMapeamento = $this->tabela->RetornaMapeamento();
-        if (!isset($colunasMapeamento)){
+        if (!$this->tabela->RetornaMapeamento()){
             return $sql;
         }
         
@@ -184,18 +177,15 @@ class Repositorio {
         $primeiro = true;
         foreach ($props as $key => $prop) {
             $propriedadeNome = $prop->getName();
-            $coluna = $colunasMapeamento[$propriedadeNome];
+            $coluna = $this->RetornaColunaMapeada($propriedadeNome);
             if (isset($coluna)){                    
                 $colunaNome = $coluna->nome;
                 $sql = $sql.(!$primeiro?", ":"").$colunaNome.($colunaNome != $propriedadeNome? " ".$propriedadeNome:"");
                 $primeiro = false;
             }
         }
-        $nomeTabela = $reflect->getName();
-        $mapeamentoTabela = $colunasMapeamento[$nomeTabela];
-        if (isset($mapeamentoTabela)){
-            $nomeTabela = $mapeamentoTabela->nome;
-        }
+        $nomeTabela = $this->tabela->RetornaNomeTabelaMapeada();
+
         $sql = $sql." FROM ".$nomeTabela;
         if (isset($criterios)){
             $parametros=[];
@@ -211,32 +201,86 @@ class Repositorio {
                 $sql = $sql." WHERE ".$this->RetornaCondicaoSQL($criterios, $parametros);
             }
         }
+        if (isset($agrupamento)){
+            $sql = $sql." GROUP BY";
+            if (is_array($agrupamento)){
+                $primeiro = true;
+                foreach ($agrupamento as $agrupamentoCampo) {
+                    $sql = $sql.(!$primeiro?", ": " ").$this->RetornaAgrupamentoSQL($agrupamentoCampo);
+                    $primeiro = false;
+                }
+            }else {
+                $sql = $sql." ".$this->RetornaAgrupamentoSQL($agrupamentoCampo);
+            }
+        }
+        if (isset($ordenacao)){
+            $sql = $sql." ORDER BY";
+            if (is_array($ordenacao)){
+                $primeiro = true;
+                foreach ($ordenacao as $ordenacaoCampo) {
+                    $sql = $sql.(!$primeiro?", ": " ").$this->RetornaOrdenacaoSQL($ordenacaoCampo);
+                    $primeiro = false;
+                }
+            }else {
+                $sql = $sql." ".$this->RetornaOrdenacaoSQL($ordenacaoCampo);
+            }
+        }
         return $sql;
     }
     private function RetornaCondicaoSQL(Utils\Criterio $criterio, &$parametros){
-        $colunasMapeamento = $this->tabela->RetornaMapeamento();
+        $operacao = $criterio->operacao;
+
         $primeiroOperador = "";
         if ($criterio->colunapropriedade){
-            $primeiroOperador = $colunasMapeamento[$criterio->coluna]->nome;
+            $coluna = $this->RetornaColunaMapeada($criterio->coluna);
+            $primeiroOperador = $coluna->nome;
         } else {
             $primeiroOperador = $this->RetornaParametroPorTipo($criterio->coluna);
             $parametros[] = $criterio->coluna;
         }
         $segundoOperador = "";
         if ($criterio->valorpropriedade){
-            $segundoOperador = $colunasMapeamento[$criterio->valor]->nome;
+            $coluna = $this->RetornaColunaMapeada($criterio->valor);
+            $segundoOperador = $coluna->nome;
         } else {
             $segundoOperador = $this->RetornaParametroPorTipo($criterio->valor);
-            $parametros[] = $criterio->valor;
+            if ($criterio->valor === null){
+                if ($operacao == "="){
+                    $operacao = "IS";
+                }else {
+                    $operacao = "IS NOT";
+                }
+                $segundoOperador = "NULL";
+            }else {
+                $parametros[] = $criterio->valor;
+            }
         }
 
-        $sql = $primeiroOperador." ".$criterio->operacao." ".$segundoOperador;
+        $sql = $primeiroOperador." ".$operacao." ".$segundoOperador;
 
         if (isset($criterio->juncao)){
             $sql = " ( ".$sql." ".$criterio->juncao." ".$this->RetornaCondicaoSQL($criterio->condicaojuncao, $parametros)." ) ";
         }
         return $sql;
     }
+    private function RetornaAgrupamentoSQL($agrupamento){
+        if (is_array($agrupamento)){
+            return $this->RetornaColunaMapeada($agrupamento[0])->nome." ".$agrupamento[1];
+        }
+        return $this->RetornaColunaMapeada($agrupamento)->nome;
+    }
+    private function RetornaOrdenacaoSQL($ordenacao){
+        if (is_array($ordenacao)){
+            return $this->RetornaColunaMapeada($ordenacao[0])->nome." ".$ordenacao[1];
+        }
+        return $this->RetornaColunaMapeada($ordenacao)->nome;
+    }
+    private function RetornaColunaMapeada($propriedade){
+        $colunasMapeamento = $this->tabela->RetornaMapeamento();
+        $coluna = $colunasMapeamento[$propriedade];
+        return $coluna;
+    }
+            
     private function RetornaParametro(Utils\TipoSQL $tipoSQL){
         $valorTipoSQL = $tipoSQL->RetornaValor();
         if ($valorTipoSQL == Utils\TipoSQL::Varchar()->RetornaValor() ||
