@@ -163,7 +163,7 @@ class Repositorio {
         $this->wpdb->flush();
         return $resultado;
     }
-    
+	
     public function RetornaSelectSQL($criterios, $agrupamento, $ordenacao, &$parametros){
         $parametros = null;
         $sql = "";
@@ -227,7 +227,7 @@ class Repositorio {
         }
         return $sql;
     }
-    private function RetornaCondicaoSQL(Utils\Criterio $criterio, &$parametros){
+    protected function RetornaCondicaoSQL(Utils\Criterio $criterio, &$parametros){
         $operacao = $criterio->operacao;
 
         $primeiroOperador = "";
@@ -263,25 +263,19 @@ class Repositorio {
         }
         return $sql;
     }
-    private function RetornaAgrupamentoSQL($agrupamento){
+    protected function RetornaAgrupamentoSQL($agrupamento){
         if (is_array($agrupamento)){
             return $this->RetornaColunaMapeada($agrupamento[0])->nome." ".$agrupamento[1];
         }
         return $this->RetornaColunaMapeada($agrupamento)->nome;
     }
-    private function RetornaOrdenacaoSQL($ordenacao){
+    protected function RetornaOrdenacaoSQL($ordenacao){
         if (is_array($ordenacao)){
             return $this->RetornaColunaMapeada($ordenacao[0])->nome." ".$ordenacao[1];
         }
         return $this->RetornaColunaMapeada($ordenacao)->nome;
-    }
-    private function RetornaColunaMapeada($propriedade){
-        $colunasMapeamento = $this->tabela->RetornaMapeamento();
-        $coluna = $colunasMapeamento[$propriedade];
-        return $coluna;
-    }
-            
-    private function RetornaParametro(Utils\TipoSQL $tipoSQL){
+    }            
+    protected function RetornaParametro(Utils\TipoSQL $tipoSQL){
         $valorTipoSQL = $tipoSQL->RetornaValor();
         if ($valorTipoSQL == Utils\TipoSQL::Varchar()->RetornaValor() ||
             $valorTipoSQL == Utils\TipoSQL::Datetime()->RetornaValor()){
@@ -294,7 +288,7 @@ class Repositorio {
             return "";
         }        
     }
-    private function RetornaParametroPorTipo($variavel){
+    protected function RetornaParametroPorTipo($variavel){
         //%d (integer) %f (float) %s (string)
         $tipoVariavel = gettype($variavel);
         if ($tipoVariavel == "integer"){

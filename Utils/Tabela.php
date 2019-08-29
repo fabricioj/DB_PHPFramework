@@ -6,9 +6,39 @@ abstract class Tabela {
     public function __construct() {
         $this->propriedades_mapeadas = $this->Mapeamento();
     }
-
-    public function RetornaMapeamento(){
+    
+	public function RetornaMapeamento(){
         return $this->propriedades_mapeadas;
+    }
+	
+	public function RetornaNomeTabelaMapeada(){
+        $reflect = new \ReflectionClass($this);
+        $nomeTabela = $reflect->getName();
+        $colunasMapeamento = $this->RetornaMapeamento();
+
+        if ($colunasMapeamento != null){
+            $mapeamentoTabela = $colunasMapeamento[$nomeTabela];
+            if (isset($mapeamentoTabela)){
+                $nomeTabela = $mapeamentoTabela->nome;
+            }
+        }
+
+        return $nomeTabela;
+    }
+	
+	public function RetornaNomeTabelaMapeada(){
+        $reflect = new \ReflectionClass($this);
+        $nomeTabela = $reflect->getName();
+        $colunasMapeamento = $this->RetornaMapeamento();
+
+        if ($colunasMapeamento != null){
+            $mapeamentoTabela = $colunasMapeamento[$nomeTabela];
+            if (isset($mapeamentoTabela)){
+                $nomeTabela = $mapeamentoTabela->nome;
+            }
+        }
+
+        return $nomeTabela;
     }
     public function CopiaRow($row){
         if ($row == null || empty($row)){
